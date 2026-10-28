@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blocky Night 3D</title>
+<style>
+:root{--panel:#111927eF;--line:#46556b;--text:#f1f6ff;--muted:#aab8ca;--green:#66f0a4;--red:#ff6678;--gold:#ffd166}
+*{box-sizing:border-box}body{margin:0;background:#080d15;color:var(--text);font-family:system-ui,Arial,sans-serif;overflow:hidden}
+button,input{font:inherit}button{border:0;border-radius:9px;padding:10px 14px;background:#3478f6;color:white;font-weight:800;cursor:pointer}button:hover{filter:brightness(1.12)}button:disabled{opacity:.45;cursor:not-allowed}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block}
+#hud{position:fixed;inset:0;pointer-events:none;display:none}
+.top{position:absolute;top:14px;left:14px;right:14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.pill{background:#0a111de8;border:1px solid #4a5a70;border-radius:22px;padding:8px 12px;font-size:12px;font-weight:900;box-shadow:0 4px 18px #0005}
+#objective{position:absolute;left:16px;top:64px;width:245px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:12px;font-size:13px;line-height:1.5}
+#objective strong{font-size:15px}#genbar{height:8px;background:#283447;border-radius:8px;overflow:hidden;margin:7px 0}#genbar span{display:block;height:100%;background:var(--green);width:0%}
+#bottom{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);text-align:center;width:min(95vw,600px)}
+#prompt{display:inline-block;background:#08101de8;border:1px solid #52627a;padding:10px 16px;border-radius:10px;font-weight:800;font-size:13px;margin-bottom:10px}
+#crosshair{position:absolute;left:50%;top:50%;width:10px;height:10px;transform:translate(-50%,-50%);border:2px solid white;border-radius:50%;box-shadow:0 0 5px #000}
+#feed{position:absolute;right:14px;top:66px;width:250px;text-align:right;font-size:12px;text-shadow:0 2px 4px black;color:#e1eaff}
+#controls{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}#controls button{pointer-events:auto;background:#152236eF;border:1px solid #52627a}
+.overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(#050912aa,#050912ee);padding:18px;z-index:10}
+.card{width:min(540px,100%);background:#111a29f5;border:1px solid #46566e;border-radius:20px;padding:24px;box-shadow:0 25px 80px #0009}
+.logo{font-size:clamp(30px,6vw,48px);font-weight:1000;letter-spacing:1px;line-height:1}.logo span{color:var(--red)}.sub{color:var(--muted);font-size:13px;margin:10px 0 20px}
+label{display:block;font-size:13px;font-weight:800;margin:12px 0 6px}input{width:100%;padding:12px;border:1px solid #46566e;background:#080f1b;color:white;border-radius:9px;outline:none}
+.row{display:flex;gap:9px;flex-wrap:wrap}.row>*{flex:1}.skinGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.skin{border:1px solid #42516a;background:#0b1320;border-radius:10px;padding:10px;text-align:center;cursor:pointer}.skin.sel{border-color:var(--gold);box-shadow:0 0 0 1px #ffd16666}.skin .avatar{font-size:29px}.skin small{display:block;color:var(--muted);font-size:10px;margin-top:4px}
+#minigame{z-index:20}.miniTrack{height:34px;background:#253147;border-radius:7px;position:relative;overflow:hidden;margin:22px 0}.zone{position:absolute;top:0;bottom:0;left:42%;width:16%;background:#3ce39a88;border-left:2px solid #8fffc5;border-right:2px solid #8fffc5}.needle{position:absolute;top:0;bottom:0;width:5px;background:#fff;left:0;box-shadow:0 0 10px white}
+#endOverlay{z-index:15}.small{font-size:12px;color:var(--muted);line-height:1.5}
+@media(max-width:650px){#objective{top:62px;width:190px;font-size:11px;padding:9px}#feed{width:150px;font-size:10px}.pill{font-size:10px;padding:7px 9px}.card{padding:18px}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+ <div class="top"><span class="pill" id="role">ROLE: WAITING</span><span class="pill" id="round">ROUND 1</span><span class="pill" id="timer">03:00</span><span class="pill" id="coins">🪙 0</span></div>
+ <div id="objective"><strong id="objTitle">Repair the generators</strong><div id="objText">Repair 5 generators to power the exit.</div><div id="genbar"><span id="genfill"></span></div><div id="genCount">Generators: 0 / 5</div><div style="margin-top:8px">Player: <b id="who">Guest</b></div><div>Character: <b id="skinName">Street Rookie</b> · Lv <b id="level">1</b></div></div>
+ <div id="crosshair"></div><div id="feed"></div>
+ <div id="bottom"><div id="prompt">WASD move · Mouse look · E interact · Shift sprint · Q power</div><div id="controls"><button id="powerBtn">✨ Use Power (Q)</button><button id="leaveBtn">⏸ Pause / Unlock Mouse</button></div></div>
+</div>
+<div class="overlay" id="login">
+ <div class="card"><div class="logo">BLOCKY <span>NIGHT 3D</span></div><div class="sub">Six blocky players enter. One killer is chosen. Can you survive the night?</div>
+ <label for="username">Choose your username</label><input id="username" maxlength="16" placeholder="e.g. ShadowSkater" autocomplete="off">
+ <label>Choose your survivor style</label><div class="skinGrid" id="skinChoices"></div>
+ <button id="start" style="width:100%;padding:13px">ENTER THE NIGHT</button>
+ <p class="small">3D first-person prototype · Use headphones for maximum spooky vibes. Best played on desktop.</p></div>
+</div>
+<div class="overlay" id="minigame" style="display:none">
+ <div class="card"><div class="logo" style="font-size:28px">GENERATOR <span>REPAIR</span></div><p>Press <b>SPACE</b> or click <b>HIT THE ZONE</b> when the moving needle is inside the green zone.</p>
+ <div class="miniTrack"><div class="zone"></div><div class="needle" id="needle"></div></div>
+ <div class="small" id="miniHint">A perfect hit gives a big repair boost. Misses make noise!</div>
+ <button id="hitZone" style="width:100%">HIT THE ZONE (SPACE)</button><p class="small">Press ESC to close the repair game.</p></div>
+</div>
+<div class="overlay" id="endOverlay" style="display:none"><div class="card"><div class="logo" id="endTitle">ROUND <span>OVER</span></div><p id="endText"></p><button id="nextRound" style="width:100%">PLAY NEXT ROUND</button></div></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(()=> {
+const $=id=>document.getElementById(id);
+const canvas=$('game');
+let renderer,scene,camera,clock,player,world=[],generators=[],bots=[],exitGate,role='survivor',round=0,time=180,playing=false,paused=false,coins=0,repairTarget=null,miniActive=false,needlePos=0,needleDir=1,miniRAF=0,killCount=0,genDone=0,playerHP=2,keys={},yaw=0,pitch=0,velocityY=0,mouseLocked=false,selectedSkin=0,level=1, xp=0, powerReady=true;
+const skins=[
+ {name:'Street Rookie',cost:0,shirt:0x2878d7,pants:0x242e44,mask:null,hat:'cap',power:'Quick Fix',emoji:'🧢'},
+ {name:'Neon Bandit',cost:90,shirt:0x1bdfc0,pants:0x151d31,mask:'neon',hat:'hood',power:'Burst Sprint',emoji:'🥷'},
+ {name:'Plague Doctor',cost:180,shirt:0x30313e,pants:0x171922,mask:'beak',hat:'wide',power:'Quiet Steps',emoji:'🎭'},
+ {name:'Skull Streetwear',cost:260,shirt:0x8b253b,pants:0x20232e,mask:'skull',hat:'beanie',power:'Second Wind',emoji:'💀'},
+ {name:'Frost Punk',cost:340,shirt:0x70d8ff,pants:0x243a56,mask:'ice',hat:'horns',power:'Radar Pulse',emoji:'🧊'},
+ {name:'Golden Menace',cost:500,shirt:0xe4a82f,pants:0x33251b,mask:'gold',hat:'crown',power:'Overcharge',emoji:'👑'}
+];
+let owned=new Set([0]),equipped=0;
+function init3D(){
+ renderer=new THREE.WebGLRenderer({canvas,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;
+ scene=new THREE.Scene();scene.background=new THREE.Color(0x080f19);scene.fog=new THREE.FogExp2(0x080f19,.018);
+ camera=new THREE.PerspectiveCamera(76,innerWidth/innerHeight,.1,250);camera.position.set(0,1.65,8);
+ scene.add(new THREE.HemisphereLight(0x9bbcff,0x182012,1.25));
+ const moon=new THREE.DirectionalLight(0xc7d8ff,2.0);moon.position.set(-15,25,10);moon.castShadow=true;moon.shadow.mapSize.set(2048,2048);scene.add(moon);
+ const fill=new THREE.PointLight(0x3e78ff,18,38);fill.position.set(0,5,0);scene.add(fill);
+ const ground=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:0x1c2927,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=0;ground.receiveShadow=true;scene.add(ground);
+ // grid paths
+ for(let i=-45;i<=45;i+=5){let line=new THREE.Mesh(new THREE.BoxGeometry(.035,.02,90),new THREE.MeshStandardMaterial({color:0x263733}));line.position.set(i,.015,0);scene.add(line);let line2=new THREE.Mesh(new THREE.BoxGeometry(90,.02,.035),new THREE.MeshStandardMaterial({color:0x263733}));line2.position.set(0,.016,i);scene.add(line2)}
+ // perimeter fences
+ for(let i=-48;i<=48;i+=3){for(const z of [-48,48]){const post=box(.22,2.2,.22,0x3c4a4e,i,1.1,z);post.castShadow=true}for(const x of [-48,48]){box(.22,2.2,.22,0x3c4a4e,x,1.1,i)}}
+ // cabins and crates
+ for(let i=0;i<16;i++){let x=(Math.random()-.5)*70,z=(Math.random()-.5)*70;if(Math.hypot(x,z)<12)continue;const w=2+Math.random()*3,h=1.4+Math.random()*2,d=2+Math.random()*3;const o=box(w,h,d,i%3===0?0x35413e:0x293238,x,h/2,z);o.userData.solid=true;world.push(o);if(i%3===0){const roof=box(w+.3,.25,d+.3,0x18252a,x,h+.1,z);roof.rotation.y=Math.random()*1}}
+ // trees
+ for(let i=0;i<42;i++){let x=(Math.random()-.5)*86,z=(Math.random()-.5)*86;if(Math.hypot(x,z)<10)continue;const trunk=box(.55,2.3,.55,0x493a2b,x,1.15,z);const crown=new THREE.Mesh(new THREE.ConeGeometry(1.8,4,5),new THREE.MeshStandardMaterial({color:i%2?0x203d31:0x172d29,roughness:1}));crown.position.set(x,3.8,z);crown.castShadow=true;scene.add(crown);world.push(trunk);trunk.userData.solid=true}
+ // exit gate
+ exitGate=new THREE.Group();exitGate.position.set(0,0,-43);scene.add(exitGate);
+ for(let x of [-3.5,3.5]){let p=box(.4,4,.45,0x59656c,x,2,0);exitGate.add(p)}
+ let lintel=box(7.4,.45,.45,0x59656c,0,4,0);exitGate.add(lintel);
+ let gate=box(5.8,2.6,.25,0x6e2939,0,1.5,0);exitGate.add(gate);exitGate.userData.gate=gate;
+ // generators
+ const positions=[[-14,-8],[13,-14],[-18,15],[18,12],[0,25]];
+ positions.forEach((p,i)=>generators.push(makeGenerator(p[0],p[1],i)));
+ // player body first person, only hands visible
+ player={mesh:makeAvatar(skins[equipped],true),x:0,z:8,speed:5,alive:true};
+ player.mesh.position.set(0,0,8);scene.add(player.mesh);
+ window.addEventListener('resize',resize);
+ clock=new THREE.Clock();animate();
+}
+function mat(color,rough=0.8,metal=0){return new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal})}
+function box(w,h,d,color,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m}
+function makeGenerator(x,z,i){
+ const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+ const base=new THREE.Mesh(new THREE.BoxGeometry(1.5,.35,1.05),mat(0x313c48));base.position.y=.2;g.add(base);
+ const body=new THREE.Mesh(new THREE.BoxGeometry(1.05,1.2,.8),mat(0x53606b,.55,.3));body.position.set(0,.95,0);body.castShadow=true;g.add(body);
+ const front=new THREE.Mesh(new THREE.BoxGeometry(.68,.28,.07),mat(0x101820));front.position.set(0,1.15,.43);g.add(front);
+ const bulb=new THREE.Mesh(new THREE.SphereGeometry(.12,12,8),new THREE.MeshBasicMaterial({color:0xffb347}));bulb.position.set(.25,1.42,.43);g.add(bulb);
+ for(let j=0;j<3;j++){const pipe=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,.65,8),mat(0x7d8b93,.4,.5));pipe.position.set(-.35+j*.35,1.55,-.2);g.add(pipe)}
+ g.userData={index:i,progress:0,done:false,bulb,base};return g
+}
+function makeAvatar(skin,first=false){
+ const root=new THREE.Group();const s=skin||skins[0];
+ const skinMat=mat(0xc98f69),shirt=mat(s.shirt),pants=mat(s.pants),black=mat(0x11131a),shoe=mat(0x0a0d13),white=mat(0xe9f3ff),accent=mat(0x4fffe1,0.3,.2);
+ function part(w,h,d,m,x,y,z){const a=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);a.position.set(x,y,z);a.castShadow=true;a.receiveShadow=true;root.add(a);return a}
+ // classic blocky proportions
+ part(.42,.72,.28,shirt,0,1.15,0);
+ part(.2,.65,.22,pants,-.13,.48,0);part(.2,.65,.22,pants,.13,.48,0);
+ part(.18,.65,.2,shirt,-.32,1.18,0);part(.18,.65,.2,shirt,.32,1.18,0);
+ part(.19,.19,.2,shoe,-.13,.1,.02);part(.19,.19,.2,shoe,.13,.1,.02);
+ part(.43,.43,.4,skinMat,0,1.78,0);
+ // hair/hood and hats
+ if(s.hat==='cap'||s.hat==='beanie'||s.hat==='hood'||s.hat==='wide'||s.hat==='crown')part(.47,.13,.43,s.hat==='crown'?mat(0xffd24d):mat(s.hat==='hood'?0x151b27:s.shirt),0,2.02,0);
+ if(s.hat==='cap')part(.5,.06,.25,mat(s.shirt),0,1.98,.23);
+ if(s.hat==='hood') {part(.5,.42,.12,mat(0x161b29),0,1.78,-.15)}
+ if(s.hat==='wide'){part(.75,.07,.7,black,0,2.03,0);part(.28,.17,.28,black,0,2.13,0)}
+ if(s.hat==='crown'){for(let i=0;i<5;i++)part(.06,.16,.07,mat(0xffd24d),-.16+i*.08,2.15,0)}
+ if(s.hat==='horns'){part(.08,.28,.08,white,-.17,2.1,0);part(.08,.28,.08,white,.17,2.1,0)}
+ if(s.hat==='horns'||s.hat==='beanie')part(.47,.12,.42,mat(s.hat==='beanie'?0x202a3d:s.shirt),0,2.02,0);
+ // eyes
+ part(.07,.07,.035,white,-.1,1.82,.205);part(.07,.07,.035,white,.1,1.82,.205);
+ part(.035,.05,.02,black,-.1,1.82,.23);part(.035,.05,.02,black,.1,1.82,.23);
+ // masks
+ if(s.mask){const maskMat=mat(s.mask==='gold'?0xe8b62c:s.mask==='ice'?0x7eeaff:s.mask==='skull'?0xd8dce4:s.mask==='beak'?0x252b36:0x111b2b,.35,.25);part(.35,.18,.07,maskMat,0,1.68,.23);if(s.mask==='beak')part(.16,.25,.2,maskMat,0,1.56,.29);if(s.mask==='skull'){part(.05,.05,.03,black,-.09,1.69,.27);part(.05,.05,.03,black,.09,1.69,.27);part(.16,.025,.03,black,0,1.62,.27)}if(s.mask==='neon'||s.mask==='ice'){part(.38,.035,.04,accent,0,1.7,.28)}}
+ // little outfit details
+ part(.22,.08,.035,mat(s.mask==='gold'?0xffd24d:0x202a3a),0,1.3,.16);
+ if(first){root.visible=false}
+ root.userData.skin=s.name;return root;
+}
+function clearSceneRound(){bots.forEach(b=>scene.remove(b.mesh));bots=[];generators.forEach(g=>{g.userData.progress=0;g.userData.done=false;g.userData.bulb.material.color.set(0xffb347);g.userData.base.material.color.set(0x313c48);g.visible=true});genDone=0}
+function startRound(){
+ round++;time=180;killCount=0;playerHP=2;playing=true;paused=false;powerReady=true;clearSceneRound();
+ role=Math.random()<1/6?'killer':'survivor';
+ player.x=0;player.z=8;player.alive=true;player.mesh.position.set(player.x,0,player.z);
+ const playerSkin=role==='killer'?{...skins[5],shirt:0x511a2a,mask:'skull',hat:'horns'}:skins[equipped];
+ scene.remove(player.mesh);player.mesh=makeAvatar(playerSkin,true);scene.add(player.mesh);
+ // five survivors total in a round: if you are survivor, 4 AI survivors and one killer; if killer, 5 AI survivors
+ const survivorCount=role==='killer'?5:4;
+ for(let i=0;i<survivorCount;i++){let s=skins[(i+1)%skins.length];let b={role:'survivor',x:-18+i*7,z:10+(i%2)*6,hp:2,alive:true,speed:2.1,mesh:makeAvatar(s),skin:s,think:0};b.mesh.position.set(b.x,0,b.z);scene.add(b.mesh);bots.push(b)}
+ if(role==='survivor'){let b={role:'killer',x:0,z:-20,hp:5,alive:true,speed:2.3,mesh:makeAvatar({name:'Night Butcher',shirt:0x401621,pants:0x19131c,mask:'skull',hat:'horns'}),think:0};b.mesh.scale.set(1.2,1.2,1.2);b.mesh.position.set(b.x,0,b.z);scene.add(b.mesh);bots.push(b)}
+ else { // player is killer; no extra AI killer
+   player.mesh.visible=false;
+ }
+ camera.position.set(player.x,1.65,player.z);yaw=0;pitch=0;
+ $('role').textContent='ROLE: '+role.toUpperCase();$('role').style.color=role==='killer'?'#ff8592':'#8dffc2';$('round').textContent='ROUND '+round;
+ $('objTitle').textContent=role==='killer'?'Hunt every survivor':'Repair the generators';$('objText').textContent=role==='killer'?'Find and eliminate all 5 survivors.':'Repair 5 generators to unlock the exit, then escape.';
+ $('who').textContent=$('username').value.trim();$('skinName').textContent=role==='killer'?'Night Butcher':skins[equipped].name;$('level').textContent=level;
+ $('hud').style.display='block';$('login').style.display='none';$('endOverlay').style.display='none';$('feed').innerHTML='';log(role==='killer'?'You are the killer. Find them.':'You are a survivor. Keep moving.');updateHUD();lockMouse();
+}
+function log(t){const d=document.createElement('div');d.textContent=t;$('feed').prepend(d);while($('feed').children.length>5)$('feed').lastChild.remove()}
+function resize(){if(!renderer)return;renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}
+function lockMouse(){if(canvas.requestPointerLock)canvas.requestPointerLock()}
+document.addEventListener('pointerlockchange',()=>{mouseLocked=document.pointerLockElement===canvas;});
+document.addEventListener('mousemove',e=>{if(!mouseLocked||!playing||miniActive)return;yaw-=e.movementX*.0023;pitch-=e.movementY*.0023;pitch=Math.max(-1.3,Math.min(1.3,pitch));});
+document.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.code==='Space'&&miniActive){e.preventDefault();hitMini()}if(e.key.toLowerCase()==='e'&&playing&&!miniActive)interact();if(e.key.toLowerCase()==='q'&&playing&&!miniActive)usePower();if(e.key==='Escape'&&miniActive){closeMini()}});
+document.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+canvas.addEventListener('click',()=>{if(playing&&!miniActive&&!mouseLocked)lockMouse()});
+function nearestGenerator(){let best=null,d=Infinity;generators.forEach(g=>{if(g.userData.done)return;let n=Math.hypot(g.position.x-player.x,g.position.z-player.z);if(n<d){best=g;d=n}});return {g:best,d}}
+function nearestBot(){let best=null,d=Infinity;bots.forEach(b=>{if(!b.alive)return;let n=Math.hypot(b.x-player.x,b.z-player.z);if(n<d){best=b;d=n}});return {b:best,d}}
+function interact(){
+ if(role==='survivor'){const {g,d}=nearestGenerator();if(g&&d<3.4){startMini(g);return}
+ if(genDone===5&&Math.hypot(player.x-exitGate.position.x,player.z-exitGate.position.z)<6){finish(true);return}
+ log(genDone===5?'The exit is open. Find the gate!':'Get closer to a generator to repair it.')}
+ else{const {b,d}=nearestBot();if(b&&d<3.5){b.hp--;log(b.hp<=0?'Survivor eliminated!':'You hit a survivor!');if(b.hp<=0){b.alive=false;scene.remove(b.mesh);killCount++;coins+=15;if(bots.filter(x=>x.role==='survivor'&&x.alive).length===0)finish(true)}updateHUD()}else log('Get closer to a survivor to attack.')}
+}
+function startMini(g){repairTarget=g;miniActive=true;$('minigame').style.display='flex';needlePos=0;needleDir=1;$('miniHint').textContent='Hit the green zone for a perfect repair!';$('hitZone').focus();cancelAnimationFrame(miniRAF);miniLoop()}
+function miniLoop(){if(!miniActive)return;needlePos+=needleDir*1.05;if(needlePos>100){needlePos=100;needleDir=-1}if(needlePos<0){needlePos=0;needleDir=1}$('needle').style.left=needlePos+'%';miniRAF=requestAnimationFrame(miniLoop)}
+function hitMini(){if(!miniActive)return;let success=needlePos>42&&needlePos<58;let good=needlePos>35&&needlePos<65;closeMini();if(success){repairTarget.userData.progress=Math.min(100,repairTarget.userData.progress+48);log('PERFECT! Generator repair +48%.')}else if(good){repairTarget.userData.progress=Math.min(100,repairTarget.userData.progress+28);log('Good timing! Repair +28%.')}else{repairTarget.userData.progress=Math.min(100,repairTarget.userData.progress+10);log('Miss! Small repair boost, and you made noise!');bots.filter(b=>b.role==='killer').forEach(b=>b.speed=3.2)}if(repairTarget.userData.progress>=100&&!repairTarget.userData.done){repairTarget.userData.done=true;repairTarget.userData.bulb.material.color.set(0x42ff9c);repairTarget.userData.base.material.color.set(0x286b4a);genDone++;coins+=20;xp+=25;if(xp>=level*100){xp-=level*100;level++;log('Character level up! Powers improve.')}log('Generator fixed ('+genDone+'/5).');if(genDone===5){exitGate.userData.gate.material.color.set(0x1caa70);exitGate.userData.gate.position.y=1.5;log('EXIT OPEN! Get to the gate!')}}updateHUD()}
+function closeMini(){miniActive=false;$('minigame').style.display='none';cancelAnimationFrame(miniRAF);if(playing)lockMouse()}
+function usePower(){if(!powerReady){log('Power is recharging.');return}powerReady=false;setTimeout(()=>powerReady=true,10000);if(role==='survivor'){const {g,d}=nearestGenerator();if(skins[equipped].power==='Quick Fix'&&g&&d<5){g.userData.progress=Math.min(100,g.userData.progress+25);log('Quick Fix added 25% progress.')}else{player.speed=8;setTimeout(()=>player.speed=5,4000);log(skins[equipped].power+' activated! Speed boost!')}}else{bots.filter(b=>b.alive).forEach(b=>{if(Math.hypot(b.x-player.x,b.z-player.z)<12)b.stun=performance.now()+2500});log('Killer power activated! Nearby survivors are stunned.')}updateHUD()}
+function updateHUD(){ $('genCount').textContent='Generators: '+genDone+' / 5';$('genfill').style.width=(genDone/5*100)+'%';$('coins').textContent='🪙 '+coins;$('level').textContent=level}
+function finish(win){if(!playing)return;playing=false;document.exitPointerLock?.();$('endOverlay').style.display='flex';$('endTitle').innerHTML=win?'VICTORY <span>!</span>':'GAME <span>OVER</span>';$('endText').textContent=win?(role==='killer'?'You eliminated every survivor!':'You escaped the nightmare!'):'The round is over. Earn coins and try another round.';coins+=win?60:15;updateHUD()}
+function animate(){
+ requestAnimationFrame(animate);if(!renderer)return;const dt=Math.min(clock.getDelta(),.05);
+ if(playing&&!paused&&!miniActive){
+   time-=dt;if(time<=0){time=0;finish(role==='killer'&&bots.filter(b=>b.role==='survivor'&&b.alive).length===0); }
+   let forward=0,side=0;if(keys.w)forward++;if(keys.s)forward--;if(keys.a)side--;if(keys.d)side++;
+   const len=Math.hypot(forward,side)||1;forward/=len;side/=len;
+   const speed=(keys.shift?player.speed*1.45:player.speed)*dt;
+   let dx=(-Math.sin(yaw)*forward+Math.cos(yaw)*side)*speed;
+   let dz=(-Math.cos(yaw)*forward-Math.sin(yaw)*side)*speed;
+   const nx=player.x+dx,nz=player.z+dz;
+   if(!collides(nx,player.z)){player.x=nx}if(!collides(player.x,nz)){player.z=nz}
+   camera.position.set(player.x,1.65,player.z);camera.rotation.order='YXZ';camera.rotation.y=yaw;camera.rotation.x=pitch;
+   player.mesh.position.set(player.x,0,player.z);player.mesh.rotation.y=yaw;
+   // simple blocky first-person sleeves/hands
+   // AI movement
+   bots.forEach(b=>{if(!b.alive)return;if(b.stun&&performance.now()<b.stun)return;
+    let tx,tz;
+    if(role==='killer'){tx=player.x;tz=player.z;if(b.role==='survivor'){// survivors flee player and loosely work on generators
+       const dist=Math.hypot(b.x-player.x,b.z-player.z);if(dist<10){tx=b.x+(b.x-player.x)*2;tz=b.z+(b.z-player.z)*2}else{let g=generators.find(g=>!g.userData.done);if(g){tx=g.position.x;tz=g.position.z}}
+    }}else if(b.role==='killer'){tx=player.x;tz=player.z}else{let g=generators.find(g=>!g.userData.done);if(g){tx=g.position.x;tz=g.position.z;if(Math.hypot(b.x-tx,b.z-tz)<2){g.userData.progress=Math.min(100,g.userData.progress+dt*5);if(g.userData.progress>=100&&!g.userData.done){g.userData.done=true;g.userData.bulb.material.color.set(0x42ff9c);genDone++;coins+=15;log('An AI teammate fixed a generator.');if(genDone===5)exitGate.userData.gate.material.color.set(0x1caa70)}}}}
+    const dd=Math.hypot(tx-b.x,tz-b.z);if(dd>.8){const sp=(b.speed||2.1)*dt;b.x+=(tx-b.x)/dd*sp;b.z+=(tz-b.z)/dd*sp;b.mesh.position.set(b.x,0,b.z);b.mesh.rotation.y=Math.atan2(tx-b.x,tz-b.z)}
+    if(role==='survivor'&&b.role==='killer'&&Math.hypot(b.x-player.x,b.z-player.z)<1.6){playerHP-=dt*.6;if(playerHP<=0)finish(false)}
+    if(role==='killer'&&b.role==='survivor'&&Math.hypot(b.x-player.x,b.z-player.z)<1.6&&keys.e){b.hp=0;b.alive=false;scene.remove(b.mesh);killCount++}
+   });
+   if(role==='survivor'&&genDone===5&&Math.hypot(player.x,player.z+43)<5.5){finish(true)}
+   $('timer').textContent=String(Math.floor(time/60)).padStart(2,'0')+':'+String(Math.floor(time%60)).padStart(2,'0');
+   const {g,d}=nearestGenerator();const {b, d:bd}=nearestBot();
+   if(role==='survivor')$('prompt').textContent=g&&d<3.4?'Press E to start generator timing mini-game':genDone===5?'Reach the glowing gate to escape':'WASD move · Mouse look · E repair · Shift sprint · Q power';
+   else $('prompt').textContent=b&&bd<3.5?'Press E to attack the survivor':'WASD move · Mouse look · E attack · Shift sprint · Q power';
+   if(role==='killer'&&bots.filter(b=>b.role==='survivor'&&b.alive).length===0)finish(true);
+   updateHUD();
+ }
+ renderer.render(scene,camera)
+}
+function collides(x,z){if(Math.abs(x)>47||Math.abs(z)>47)return true;for(const o of world){if(!o.userData.solid)continue;let p=o.position;if(Math.abs(x-p.x)<1.2&&Math.abs(z-p.z)<1.2)return true}return false}
+function showSkins(){const root=$('skinChoices');root.innerHTML='';skins.forEach((s,i)=>{const el=document.createElement('div');el.className='skin'+(selectedSkin===i?' sel':'');el.innerHTML='<div class="avatar">'+s.emoji+'</div><b>'+s.name+'</b><small>'+(i===0?'FREE':(owned.has(i)?'UNLOCKED':s.cost+' coins'))+'<br>'+s.power+'</small>';el.onclick=()=>{if(owned.has(i)){selectedSkin=i;document.querySelectorAll('.skin').forEach((x,j)=>x.classList.toggle('sel',j===i))}else if(coins>=s.cost){coins-=s.cost;owned.add(i);selectedSkin=i;showSkins()}else{el.querySelector('small').textContent='Need '+s.cost+' coins — earn coins by playing!'}};root.appendChild(el)})}
+$('start').onclick=()=>{const name=$('username').value.trim();if(!name){$('username').focus();$('username').placeholder='Please enter a username first!';return}equipped=selectedSkin;init3D();startRound()};
+$('hitZone').onclick=hitMini;$('powerBtn').onclick=usePower;$('leaveBtn').onclick=()=>{if(mouseLocked)document.exitPointerLock?.();else if(playing)lockMouse()};$('nextRound').onclick=()=>startRound();
+showSkins();
+})();
+</script>
+</body></html>
